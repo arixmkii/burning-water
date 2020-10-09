@@ -1,5 +1,5 @@
 package waterplanner
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 /**
   * Created by richardweiss on 6/8/17.
   */

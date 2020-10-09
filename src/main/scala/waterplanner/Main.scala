@@ -1,6 +1,10 @@
 package waterplanner
 
+//import org.optaplanner.core.api.score.stream.ConstraintStreamImplType
 import org.optaplanner.core.api.solver.{Solver, SolverFactory}
+import org.optaplanner.core.config.score.director.ScoreDirectorFactoryConfig
+import org.optaplanner.core.config.solver.SolverConfig
+import org.optaplanner.core.config.solver.termination.TerminationConfig
 
 /**
   * Created by richardweiss on 5/8/17.
@@ -33,20 +37,47 @@ object Main extends App {
     new WaterProblem(5, containers, useGrains)
   }
 
-  val problem = makeProblem()
-  // Work around SBT's derpyness with resource and class loading.
-  // https://stackoverflow.com/questions/6485880/how-can-i-access-a-resource-when-running-an-sbt-runtask
-  val configStream = Class.forName("waterplanner.Main").getResourceAsStream("/waterplanner/solverconfig.xml")
-  assert(configStream != null)
-  val solverFactory: SolverFactory[WaterProblem] = SolverFactory.createFromXmlInputStream(configStream)
-  val solver: Solver[WaterProblem] = solverFactory.buildSolver
-  val solvedWaterProblem = solver.solve(problem)
-  val ws = new WaterSolutionScore()
-  val score = ws.calculateScore(solvedWaterProblem)
-  // Before/after
-  println(ws.scoreString(problem))
-  print(problem)
+  def solveNew(problem: WaterProblem): WaterProblem = {
+    val terminationConfig = new TerminationConfig()
+      .withSecondsSpentLimit(30)
+    val scoreDirectorFactoryConfig = new ScoreDirectorFactoryConfig()
+      .withConstraintProviderClass(classOf[WaterSolutionConstraintProvider])
+//      .withConstraintStreamImplType(ConstraintStreamImplType.BAVET) // BAVET doesn't work with BigDecimals
+    val solverConfig = new SolverConfig()
+      .withTerminationConfig(terminationConfig)
+      .withScoreDirectorFactory(scoreDirectorFactoryConfig)
+      .withEntityClasses(classOf[WaterUseDay])
+      .withSolutionClass(classOf[WaterProblem])
+    val solverFactory: SolverFactory[WaterProblem] = SolverFactory.create(solverConfig)
+    val solver: Solver[WaterProblem] = solverFactory.buildSolver
+    val solvedWaterProblem = solver.solve(problem)
+    solvedWaterProblem
+  }
+
+  def solveOriginal(problem: WaterProblem): WaterProblem = {
+    val configStream = Class.forName("waterplanner.Main").getResourceAsStream("/waterplanner/solverconfig.xml")
+    assert(configStream != null)
+    val solverFactory: SolverFactory[WaterProblem] = SolverFactory.create(SolverConfig.createFromXmlInputStream(configStream))
+    val solver: Solver[WaterProblem] = solverFactory.buildSolver
+    val solvedWaterProblem = solver.solve(problem)
+    solvedWaterProblem
+  }
+
+  val problem1 = makeProblem()
+  val problem2 = makeProblem()
+
+  val solvedWaterProblem1 = solveNew(problem1)
+  val solvedWaterProblem2 = solveOriginal(problem2)
+
+  print(problem1)
   println("----------")
-  println(ws.scoreString(solvedWaterProblem))
-  print(solvedWaterProblem)
+  print(solvedWaterProblem1)
+  println(">>>>>>>>>>")
+  println(solvedWaterProblem1.score)
+  println("==========")
+  print(solvedWaterProblem2)
+  println(">>>>>>>>>>")
+  println(solvedWaterProblem2.score)
+
+  assert(solvedWaterProblem1.score == solvedWaterProblem2.score)
 }
